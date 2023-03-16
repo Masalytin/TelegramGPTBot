@@ -1,6 +1,9 @@
 package tg.masal.telegramgptbot.service;
 
+import java.awt.Button;
 import java.util.ArrayList;
+
+import javax.swing.ButtonGroup;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -10,14 +13,19 @@ import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboard;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
 import tg.masal.telegramgptbot.config.BotConfig;
 
 @Service
 public class TelegramBot extends TelegramLongPollingBot {
-	@Autowired
-	BotConfig config;
+	
+	final BotConfig config;
+	
+	public TelegramBot(BotConfig config) {
+		this.config = config;
+	}
 
 	@Override
 	public String getBotUsername() {
@@ -37,14 +45,22 @@ public class TelegramBot extends TelegramLongPollingBot {
 	}
 
 	private void messageHander(Message message) {
-		
 		if (message.hasText()) {
 			String text = message.getText();
 			long chatId = message.getChatId();
-			if (text.equals("/start ")) {
+			ReplyKeyboardMarkup mainMenu = new ReplyKeyboardMarkup() {{
+				setKeyboard(new ArrayList<>() {{
+					add(new KeyboardRow() {{
+						add("Test");
+						add("button2");
+					}});
+				}});
+				setResizeKeyboard(true);
+			}};
+			if (text.equals("/start")) {
 				sendMessage(chatId, "Hello");
 			} else {
-				sendMessage(chatId, "", new ReplyKeyboardMarkup(new ArrayList<>()));
+				sendMessage(chatId, "Test", mainMenu);
 			}
 		}
 	}
@@ -57,7 +73,11 @@ public class TelegramBot extends TelegramLongPollingBot {
 		}
 	}
 	
-	private void sendMessage(long chatId, String message, ReplyKeyboard keyboard) {
-		
+	private void sendMessage(long chatId, String text, ReplyKeyboard keyboard) {
+		try {
+			execute(SendMessage.builder().chatId(chatId).text(text).replyMarkup(keyboard).build());
+		} catch (TelegramApiException e) {
+			e.printStackTrace();
+		}
 	}
 }

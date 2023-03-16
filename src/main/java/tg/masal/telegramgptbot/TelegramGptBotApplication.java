@@ -12,12 +12,6 @@ public class TelegramGptBotApplication {
 
 	public static void main(String[] args) {
 		SpringApplication.run(TelegramGptBotApplication.class, args);
-		try {
-			TelegramBotsApi botsApi = new TelegramBotsApi(DefaultBotSession.class);
-			botsApi.registerBot(new TelegramBot());
-        } catch (TelegramApiException e) {
-            e.printStackTrace();
-        }
 	}
 
 }
