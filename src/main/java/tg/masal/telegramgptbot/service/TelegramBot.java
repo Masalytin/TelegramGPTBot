@@ -1,11 +1,9 @@
 package tg.masal.telegramgptbot.service;
 
-import java.awt.Button;
+import java.io.IOException;
 import java.util.ArrayList;
 
-import javax.swing.ButtonGroup;
-
-import org.springframework.beans.factory.annotation.Autowired;
+import org.apache.http.client.ClientProtocolException;
 import org.springframework.stereotype.Service;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
@@ -21,10 +19,12 @@ import tg.masal.telegramgptbot.config.BotConfig;
 @Service
 public class TelegramBot extends TelegramLongPollingBot {
 	
-	final BotConfig config;
+	private final BotConfig config;
+	private final CharGPTService chatGPTService;
 	
-	public TelegramBot(BotConfig config) {
+	public TelegramBot(BotConfig config, CharGPTService chatGPTService) {
 		this.config = config;
+		this.chatGPTService = chatGPTService;
 	}
 
 	@Override
@@ -61,6 +61,13 @@ public class TelegramBot extends TelegramLongPollingBot {
 				sendMessage(chatId, "Hello");
 			} else {
 				sendMessage(chatId, "Test", mainMenu);
+				try {
+					sendMessage(chatId, chatGPTService.generateResponse(text));
+				} catch (ClientProtocolException e) {
+					e.printStackTrace();
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
 			}
 		}
 	}
@@ -69,7 +76,6 @@ public class TelegramBot extends TelegramLongPollingBot {
 		try {
 			execute(SendMessage.builder().chatId(chatId).text(text).build());
 		} catch (TelegramApiException e) {
-			e.printStackTrace();
 		}
 	}
 	
