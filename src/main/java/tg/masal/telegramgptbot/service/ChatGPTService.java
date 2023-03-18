@@ -3,6 +3,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import okhttp3.*;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.PropertySource;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -10,13 +12,11 @@ import java.io.IOException;
 @Service
 public class ChatGPTService {
 
-    private final String OPENAI_API_URL = "https://api.openai.com/v1/engines/text-davinci-003/completions";
-
     private final OkHttpClient httpClient;
     private final ObjectMapper objectMapper;
 
     @Autowired
-    private ApiKeyService apiKeyService;
+    private ApiService apiKeyService;
 
     public ChatGPTService() {
         httpClient = new OkHttpClient();
@@ -26,14 +26,14 @@ public class ChatGPTService {
     public String getResponse(String prompt) throws IOException {
         ObjectNode requestBody = objectMapper.createObjectNode();
         requestBody.put("prompt", prompt);
-        requestBody.put("max_tokens", 50);
+        requestBody.put("max_tokens", 250);
         requestBody.put("temperature", 0.7);
 
         RequestBody body = RequestBody.create(
                 MediaType.parse("application/json"), requestBody.toString());
 
         Request request = new Request.Builder()
-                .url(OPENAI_API_URL)
+                .url(apiKeyService.apiUrl)
                 .addHeader("Content-Type", "application/json")
                 .addHeader("Authorization", "Bearer " + apiKeyService.getApiKey())
                 .post(body)

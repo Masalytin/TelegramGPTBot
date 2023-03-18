@@ -4,17 +4,19 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.PropertySource;
 import org.springframework.stereotype.Service;
 
-@Service
-@PropertySource("application.properties")
-public class ApiKeyService {
-	final String apiKey;
+import lombok.Getter;
 
-	public ApiKeyService(@Value("${chatgpt.apiKey}") String apiKey) {
+@Service
+@Getter
+@PropertySource("application.properties")
+public class ApiService {
+	final String apiKey;
+	final String apiUrl;
+
+	public ApiService(@Value("${chatgpt.apiKey}") String apiKey, @Value("${chatgpt.apiUrl}") String apiUrl) {
 		super();
 		this.apiKey = apiKey;
+		this.apiUrl = apiUrl;
 	}
-
-	public String getApiKey() {
-		return apiKey;
-	}
+	
 }

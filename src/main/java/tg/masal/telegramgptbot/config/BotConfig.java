@@ -7,6 +7,9 @@ import org.springframework.context.annotation.PropertySource;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import lombok.Getter;
+
+@Getter
 @Configuration
 @PropertySource("application.properties")
 public class BotConfig {
@@ -14,14 +17,6 @@ public class BotConfig {
 	private String name;
 	@Value("${bot.token}")
 	private String token;
-	
-	public String getName() {
-		return name;
-	}
-	
-	public String getToken() {
-		return token;
-	}
 	
 	@Bean
 	public ObjectMapper objectMapper() {
