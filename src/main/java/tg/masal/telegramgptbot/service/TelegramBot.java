@@ -20,9 +20,9 @@ import tg.masal.telegramgptbot.config.BotConfig;
 public class TelegramBot extends TelegramLongPollingBot {
 	
 	private final BotConfig config;
-	private final CharGPTService chatGPTService;
+	private final ChatGPTService chatGPTService;
 	
-	public TelegramBot(BotConfig config, CharGPTService chatGPTService) {
+	public TelegramBot(BotConfig config, ChatGPTService chatGPTService) {
 		this.config = config;
 		this.chatGPTService = chatGPTService;
 	}
@@ -62,7 +62,8 @@ public class TelegramBot extends TelegramLongPollingBot {
 			} else {
 				sendMessage(chatId, "Test", mainMenu);
 				try {
-					sendMessage(chatId, chatGPTService.generateResponse(text));
+					String response = chatGPTService.getResponse(text); 
+					sendMessage(chatId, response);
 				} catch (ClientProtocolException e) {
 					e.printStackTrace();
 				} catch (IOException e) {
