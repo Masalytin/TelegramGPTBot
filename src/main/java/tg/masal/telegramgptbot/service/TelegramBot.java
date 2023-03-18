@@ -60,10 +60,9 @@ public class TelegramBot extends TelegramLongPollingBot {
 			if (text.equals("/start")) {
 				sendMessage(chatId, "Hello");
 			} else {
-				sendMessage(chatId, "Test", mainMenu);
 				try {
 					String response = chatGPTService.getResponse(text); 
-					sendMessage(chatId, response);
+					sendMessage(chatId, response, mainMenu);
 				} catch (ClientProtocolException e) {
 					e.printStackTrace();
 				} catch (IOException e) {

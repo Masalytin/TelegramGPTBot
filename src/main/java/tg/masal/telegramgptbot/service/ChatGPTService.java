@@ -10,7 +10,7 @@ import java.io.IOException;
 @Service
 public class ChatGPTService {
 
-    private final String OPENAI_API_URL = "https://api.openai.com/v3/engines/davinci-codex/completions";
+    private final String OPENAI_API_URL = "https://api.openai.com/v1/engines/text-davinci-003/completions";
 
     private final OkHttpClient httpClient;
     private final ObjectMapper objectMapper;
@@ -26,7 +26,7 @@ public class ChatGPTService {
     public String getResponse(String prompt) throws IOException {
         ObjectNode requestBody = objectMapper.createObjectNode();
         requestBody.put("prompt", prompt);
-        requestBody.put("max_tokens", 500);
+        requestBody.put("max_tokens", 50);
         requestBody.put("temperature", 0.7);
 
         RequestBody body = RequestBody.create(
