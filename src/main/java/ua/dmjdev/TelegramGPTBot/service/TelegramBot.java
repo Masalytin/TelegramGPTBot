@@ -1,10 +1,7 @@
 package ua.dmjdev.TelegramGPTBot.service;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.PropertySource;
 import org.springframework.stereotype.Component;
-import org.telegram.telegrambots.bots.DefaultBotOptions;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.groupadministration.GetChatMember;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
@@ -15,18 +12,21 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMa
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboard;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardButton;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
+import ua.dmjdev.TelegramGPTBot.config.BotConfig;
+import ua.dmjdev.TelegramGPTBot.models.User;
 
+import java.io.IOException;
 import java.util.ArrayList;
 
 @Component
-@PropertySource("application.properties")
 public class TelegramBot extends TelegramLongPollingBot {
 
     @Autowired
     private ChatGPTService gptService;
+    @Autowired
+    private BotConfig config;
 
     private final ReplyKeyboardMarkup mainMenu = ReplyKeyboardMarkup.builder()
             .keyboard(new ArrayList<>() {{
@@ -41,8 +41,14 @@ public class TelegramBot extends TelegramLongPollingBot {
                 }});
             }}).build();
 
-    public TelegramBot(DefaultBotOptions options, @Value("${bot.token}") String botToken) {
-        super(options, botToken);
+    @Override
+    public String getBotUsername() {
+        return config.getUsername();
+    }
+
+    @Override
+    public String getBotToken() {
+        return config.getToken();
     }
 
     @Override
@@ -70,6 +76,7 @@ public class TelegramBot extends TelegramLongPollingBot {
             }
             String text = message.getText();
             long uid = message.getFrom().getId();
+            User chatUser;
             if (text.startsWith("/start")) {
                 sendMessage(uid, "\uD83E\uDD16");
                 sendMessage(uid, "Hello", mainMenu);
@@ -86,16 +93,13 @@ public class TelegramBot extends TelegramLongPollingBot {
                             }}).build());
                 }
                 Message responseMessage = sendMessage(uid, "\uD83D\uDCE4");
-                editMessageText(responseMessage, gptService.getResponse(text));
-                editMessageText(responseMessage, "❌");
+                try {
+                    editMessageText(responseMessage, gptService.getResponse(text));
+                } catch (IOException e) {
+                    editMessageText(responseMessage, "❌");
+                }
             }
         }
-    }
-
-    @Override
-    @Value("${bot.name}")
-    public String getBotUsername() {
-        return "";
     }
 
     private Message sendMessage(long uid, String text) throws TelegramApiException {
