@@ -6,11 +6,5 @@ import java.util.List;
 
 @Data
 public class OpenAIResponse {
-    @Data
-    public class Choice {
-        private String text;
-        private double score;
-    }
-
-    private List<Choice> choices;
+    private List<Message> choices;
 }

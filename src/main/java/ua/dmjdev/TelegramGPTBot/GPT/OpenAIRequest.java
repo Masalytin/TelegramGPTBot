@@ -7,8 +7,7 @@ import java.util.List;
 @Data
 public class OpenAIRequest {
     private String model;
-    private String prompt;
-    private int maxTokens;
+    private int max_tokens;
     private double temperature;
-    private List<String> n;
+    private List<Message> messages;
 }

@@ -1,6 +1,8 @@
 package ua.dmjdev.TelegramGPTBot.service;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.PropertySource;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.groupadministration.GetChatMember;
@@ -21,12 +23,17 @@ import java.io.IOException;
 import java.util.ArrayList;
 
 @Component
+@PropertySource("application.properties")
 public class TelegramBot extends TelegramLongPollingBot {
 
     @Autowired
     private ChatGPTService gptService;
     @Autowired
     private BotConfig config;
+
+    public TelegramBot(@Value("${bot.token}") String token) {
+        super(token);
+    }
 
     private final ReplyKeyboardMarkup mainMenu = ReplyKeyboardMarkup.builder()
             .keyboard(new ArrayList<>() {{
@@ -44,11 +51,6 @@ public class TelegramBot extends TelegramLongPollingBot {
     @Override
     public String getBotUsername() {
         return config.getUsername();
-    }
-
-    @Override
-    public String getBotToken() {
-        return config.getToken();
     }
 
     @Override
@@ -95,7 +97,8 @@ public class TelegramBot extends TelegramLongPollingBot {
                 Message responseMessage = sendMessage(uid, "\uD83D\uDCE4");
                 try {
                     editMessageText(responseMessage, gptService.getResponse(text));
-                } catch (IOException e) {
+                } catch (Exception e) {
+                    System.out.println(e.getMessage());
                     editMessageText(responseMessage, "❌");
                 }
             }
