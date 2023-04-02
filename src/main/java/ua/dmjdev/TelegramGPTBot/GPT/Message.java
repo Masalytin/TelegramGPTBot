@@ -11,6 +11,9 @@ public class Message {
     private Role role;
     private String content;
 
+//    public int getTokensCount() {
+//        return 0;
+//    }
     @Override
     public String toString() {
         return role + " : " + content;

@@ -1,17 +1,12 @@
 package ua.dmjdev.TelegramGPTBot.GPT;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 public enum Role {
-    system("system"),
-    user("user"),
-    assistant("assistant");
-    private String  name;
-
-    Role(String name) {
-        this.name = name;
-    }
-
-    @Override
-    public String toString() {
-        return name;
-    }
+    @JsonProperty("system")
+    SYSTEM,
+    @JsonProperty("user")
+    USER,
+    @JsonProperty("assistant")
+    ASSISTANT;
 }

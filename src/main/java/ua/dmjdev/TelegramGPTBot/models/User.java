@@ -16,8 +16,13 @@ public class User {
     @Id
     private long id;
     private List<Message> messages = new ArrayList();
+    private int countOfMessages;
 
     public User(long id) {
         this.id = id;
+    }
+
+    public void incCountOfMessages() {
+        countOfMessages++;
     }
 }
