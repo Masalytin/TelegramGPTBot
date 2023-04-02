@@ -16,35 +16,38 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMar
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
+import ua.dmjdev.TelegramGPTBot.GPT.Role;
 import ua.dmjdev.TelegramGPTBot.config.BotConfig;
 import ua.dmjdev.TelegramGPTBot.models.User;
+import ua.dmjdev.TelegramGPTBot.repo.UserRepository;
 
-import java.io.IOException;
 import java.util.ArrayList;
+import java.util.List;
 
 @Component
 @PropertySource("application.properties")
 public class TelegramBot extends TelegramLongPollingBot {
+    private final UserRepository userRepository;
+    private final ChatGPTService gptService;
+    private final BotConfig config;
 
-    @Autowired
-    private ChatGPTService gptService;
-    @Autowired
-    private BotConfig config;
-
-    public TelegramBot(@Value("${bot.token}") String token) {
+    public TelegramBot(@Value("${bot.token}") String token, ChatGPTService gptService, BotConfig config, UserRepository userRepository) {
         super(token);
+        this.gptService = gptService;
+        this.config = config;
+        this.userRepository = userRepository;
     }
 
     private final ReplyKeyboardMarkup mainMenu = ReplyKeyboardMarkup.builder()
             .keyboard(new ArrayList<>() {{
                 add(new KeyboardRow() {{
-                    add("");
-                    add("");
-                    add("");
+                    add("Тестовые");
+                    add("кнопки");
+                    add("пока");
                 }});
                 add(new KeyboardRow() {{
-                    add("");
-                    add("");
+                    add("не");
+                    add("работают");
                 }});
             }}).build();
 
@@ -78,7 +81,18 @@ public class TelegramBot extends TelegramLongPollingBot {
             }
             String text = message.getText();
             long uid = message.getFrom().getId();
-            User chatUser;
+            User chatUser = userRepository.findUserById(uid);
+            if (chatUser == null) {
+                User user = new User(uid);
+                user.getMessages().add(new ua.dmjdev.TelegramGPTBot.GPT.Message(Role.system,
+                        "I'm telegram which use ChatGPT Api and send your queries to ChatGPT and give you answer"));
+                userRepository.save(user);
+                if (text.startsWith("/start")) {
+                    sendMessage(uid, "\uD83E\uDD16");
+                    sendMessage(uid, "Welcome", mainMenu);
+                    return;
+                }
+            }
             if (text.startsWith("/start")) {
                 sendMessage(uid, "\uD83E\uDD16");
                 sendMessage(uid, "Hello", mainMenu);
@@ -95,10 +109,14 @@ public class TelegramBot extends TelegramLongPollingBot {
                             }}).build());
                 }
                 Message responseMessage = sendMessage(uid, "\uD83D\uDCE4");
+                chatUser.getMessages().add(new ua.dmjdev.TelegramGPTBot.GPT.Message(Role.user, text));
                 try {
-                    editMessageText(responseMessage, gptService.getResponse(text));
+                    ua.dmjdev.TelegramGPTBot.GPT.Message response = gptService.getResponse(chatUser.getMessages());
+                    chatUser.getMessages().add(response);
+                    userRepository.save(chatUser);
+                    editMessageText(responseMessage, response.getContent());
                 } catch (Exception e) {
-                    System.out.println(e.getMessage());
+                    e.printStackTrace();
                     editMessageText(responseMessage, "❌");
                 }
             }

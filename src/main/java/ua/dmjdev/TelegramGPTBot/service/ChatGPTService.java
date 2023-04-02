@@ -21,17 +21,14 @@ public class ChatGPTService {
     @Autowired
     ChatGPTConfig gptConfig;
 
-    public String getResponse(String prompt) throws IOException {
+    public Message getResponse(List<Message> messages) throws IOException {
         OkHttpClient httpClient = new OkHttpClient();
         ObjectMapper objectMapper = new ObjectMapper();
         OpenAIRequest openAIRequest = new OpenAIRequest();
         openAIRequest.setModel("gpt-3.5-turbo");
-        openAIRequest.setMax_tokens(100);
+        openAIRequest.setMax_tokens(150);
         openAIRequest.setTemperature(1);
-        openAIRequest.setMessages(List.of(
-                new Message(Role.system, "I'm telegram which use ChatGPT Api and send your queries to ChatGPT and give you answer"),
-                new Message(Role.user, prompt)
-        ));
+        openAIRequest.setMessages(messages);
         String requestBody = objectMapper.writeValueAsString(openAIRequest);
         Request request = new Request.Builder()
                 .url(gptConfig.getUrl())
@@ -44,7 +41,6 @@ public class ChatGPTService {
 
         ObjectNode jsonResponse = (ObjectNode) objectMapper.readTree(responseBody);
         System.out.println(jsonResponse.get("choices").get(0));
-        String output = jsonResponse.get("choices").get(0).get("message").get("content").asText();
-        return output;
+        return objectMapper.readValue(jsonResponse.get("choices").get(0).get("message").toString(), Message.class);
     }
 }

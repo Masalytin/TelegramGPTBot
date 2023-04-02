@@ -1,17 +1,23 @@
 package ua.dmjdev.TelegramGPTBot.models;
 
-import jakarta.persistence.Entity;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.Document;
 import ua.dmjdev.TelegramGPTBot.GPT.Message;
 
+import java.util.ArrayList;
 import java.util.List;
 
-@Entity
 @NoArgsConstructor
 @Data
+@Document
 public class User {
+    @Id
     private long id;
-    private String name;
-    private List<Message> messages;
+    private List<Message> messages = new ArrayList();
+
+    public User(long id) {
+        this.id = id;
+    }
 }
