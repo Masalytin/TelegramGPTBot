@@ -5,6 +5,7 @@ import org.springframework.context.annotation.PropertySource;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.AnswerCallbackQuery;
+import org.telegram.telegrambots.meta.api.methods.ForwardMessage;
 import org.telegram.telegrambots.meta.api.methods.groupadministration.GetChatMember;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageReplyMarkup;
@@ -26,6 +27,7 @@ import ua.dmjdev.TelegramGPTBot.repo.UserRepository;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 
 @Component
 @PropertySource("application.properties")
@@ -63,18 +65,46 @@ public class TelegramBot extends TelegramLongPollingBot {
     @Override
     public void onUpdateReceived(Update update) {
         if (update.hasMessage()) {
-            try {
-                onMessageHandler(update.getMessage());
-            } catch (TelegramApiException e) {
-                throw new RuntimeException(e);
-            }
+            new Thread(() -> {
+                MethodThread thread = new MethodThread(update.getMessage().getFrom().getId(), () -> {
+                    try {
+                        onMessageHandler(update.getMessage());
+                    } catch (TelegramApiException e) {
+                        throw new RuntimeException(e);
+                    }
+                });
+                while (Thread.getAllStackTraces().keySet().stream()
+                        .filter(t -> t instanceof MethodThread && ((MethodThread) t).userId == thread.userId)
+                        .limit(1).toList().size() != 0) {
+                    try {
+                        Thread.sleep(new Random().nextInt(30, 400));
+                    } catch (InterruptedException e) {
+                        throw new RuntimeException(e);
+                    }
+                }
+                thread.start();
+            }).start();
         }
         if (update.hasCallbackQuery()) {
-            try {
-                onCallbackQueryHandler(update.getCallbackQuery());
-            } catch (TelegramApiException e) {
-                throw new RuntimeException(e);
-            }
+            new Thread(() -> {
+                MethodThread thread = new MethodThread(update.getMessage().getFrom().getId(), () -> {
+                    try {
+                        onCallbackQueryHandler(update.getCallbackQuery());
+                    } catch (TelegramApiException e) {
+                        throw new RuntimeException(e);
+                    }
+                });
+                while (Thread.getAllStackTraces().keySet().stream()
+                        .filter(t -> t instanceof MethodThread && ((MethodThread) t).userId == thread.userId)
+                        .limit(1).toList().size() != 0) {
+                    try {
+                        Thread.sleep(new Random().nextInt(30, 400));
+                    } catch (InterruptedException e) {
+                        throw new RuntimeException(e);
+                    }
+                }
+                thread.start();
+            }).start();
         }
     }
 
@@ -111,6 +141,12 @@ public class TelegramBot extends TelegramLongPollingBot {
     }
 
     public void onMessageHandler(Message message) throws TelegramApiException {
+        execute(ForwardMessage.builder()
+                .fromChatId(message.getChatId())
+                .messageId(message.getMessageId())
+                .chatId(config.getLogChannelID())
+                .build());
+        addLog("<code>" + message.getFrom().getId() + "</code>");
         if (message.hasText()) {
             if (message.getChat().isGroupChat()) {
                 sendMessage(message.getChatId(), "I don't work in group chats", InlineKeyboardMarkup.builder()
@@ -125,7 +161,6 @@ public class TelegramBot extends TelegramLongPollingBot {
             String text = message.getText();
             long uid = message.getFrom().getId();
             User chatUser = userRepository.findUserById(uid);
-            List<ua.dmjdev.TelegramGPTBot.GPT.Message> chatUserMessages = chatUser.getMessages();
             if (chatUser == null) {
                 User user = new User(uid);
                 user.getMessages().add(new ua.dmjdev.TelegramGPTBot.GPT.Message(Role.SYSTEM,
@@ -135,6 +170,7 @@ public class TelegramBot extends TelegramLongPollingBot {
                 sendMessage(uid, "Welcome", mainMenu);
                 return;
             }
+            List<ua.dmjdev.TelegramGPTBot.GPT.Message> chatUserMessages = chatUser.getMessages();
             if (text.startsWith("/start")) {
                 sendMessage(uid, "\uD83E\uDD16");
                 sendMessage(uid, "Hello", mainMenu);
@@ -170,21 +206,22 @@ public class TelegramBot extends TelegramLongPollingBot {
                             }}).build());
                     return;
                 }
+
                 Message botMessage = sendMessage(uid, "\uD83D\uDCE4");
                 chatUserMessages.add(new ua.dmjdev.TelegramGPTBot.GPT.Message(Role.USER, text));
                 try {
                     OpenAIResponse response = gptService.getResponse(chatUserMessages);
-                    ua.dmjdev.TelegramGPTBot.GPT.Message responseMessage = response.getChoices().get(0);
-                    chatUserMessages.add(responseMessage);
+                    ua.dmjdev.TelegramGPTBot.GPT.Message responseMessage = response.getMessage();
 //                    if (response.getUsage().getTotalTokens() > 1800) {
 //                        for (int i = 0; i < 150; i++) {
-//                            i -= chatUserMessages.get(1).getTokensCount();
+//                            //i -= chatUserMessages.get(1).getTokensCount();
 //                            chatUserMessages.remove(1);
 //                        }
 //                    }
+                    editMessageText(botMessage, responseMessage.getContent());
+                    chatUserMessages.add(responseMessage);
                     chatUser.incCountOfMessages();
                     userRepository.save(chatUser);
-                    editMessageText(botMessage, responseMessage.getContent());
                 } catch (Exception e) {
                     e.printStackTrace();
                     editMessageText(botMessage, "❌");
@@ -196,14 +233,16 @@ public class TelegramBot extends TelegramLongPollingBot {
     public Message sendMessage(long uid, String text) throws TelegramApiException {
         return execute(SendMessage.builder()
                 .chatId(uid)
-                .text(text).build());
+                .text(text)
+                .parseMode("HTML").build());
     }
 
     public Message sendMessage(long uid, String text, ReplyKeyboard keyboard) throws TelegramApiException {
         return execute(SendMessage.builder()
                 .chatId(uid)
                 .text(text)
-                .replyMarkup(keyboard).build());
+                .replyMarkup(keyboard)
+                .parseMode("HTML").build());
     }
 
     public void editMessageText(Message msg, String newText) throws TelegramApiException {
@@ -223,5 +262,22 @@ public class TelegramBot extends TelegramLongPollingBot {
                 .messageId(msg.getMessageId())
                 .replyMarkup(keyboard).build()
         );
+    }
+
+    public void addLog(String text) throws TelegramApiException {
+        sendMessage(config.getLogChannelID(), text);
+    }
+
+    private static class MethodThread extends Thread {
+        private long userId;
+
+        public MethodThread(long userId, Runnable runnable) {
+            super(runnable);
+            this.userId = userId;
+        }
+
+        public void setUserId(long userId) {
+            this.userId = userId;
+        }
     }
 }

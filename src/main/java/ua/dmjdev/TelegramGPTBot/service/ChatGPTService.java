@@ -1,5 +1,6 @@
 package ua.dmjdev.TelegramGPTBot.service;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.PropertyNamingStrategy;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -32,6 +33,7 @@ public class ChatGPTService {
         ObjectMapper objectMapper = new ObjectMapper();
         objectMapper.registerModule(new ParameterNamesModule());
         objectMapper.setPropertyNamingStrategy(PropertyNamingStrategy.SNAKE_CASE);
+        objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
         OpenAIRequest openAIRequest = new OpenAIRequest();
         openAIRequest.setModel("gpt-3.5-turbo");
         openAIRequest.setMaxTokens(150);
@@ -41,9 +43,12 @@ public class ChatGPTService {
         Request request = new Request.Builder().url(gptConfig.getUrl()).addHeader("Content-Type", "application/json").addHeader("Authorization", "Bearer " + gptConfig.getToken()).post(RequestBody.create(MediaType.parse("application/json"), requestBody)).build();
         Response response = httpClient.newCall(request).execute();
         String responseBody = response.body().string();
-        System.out.println(responseBody);
-
         ObjectNode jsonResponse = (ObjectNode) objectMapper.readTree(responseBody);
-        return objectMapper.readValue(jsonResponse.toString(), OpenAIResponse.class);
+        OpenAIResponse openAIResponse = new OpenAIResponse();
+        openAIResponse.setMessage(objectMapper.readValue(jsonResponse.get("choices").get(0).get("message").toString()
+                , Message.class));
+        openAIResponse.setUsage(objectMapper.readValue(jsonResponse.get("usage").toString()
+                , OpenAIResponse.Usage.class));
+        return openAIResponse;
     }
 }
