@@ -5,7 +5,6 @@ import org.springframework.context.annotation.PropertySource;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.AnswerCallbackQuery;
-import org.telegram.telegrambots.meta.api.methods.ForwardMessage;
 import org.telegram.telegrambots.meta.api.methods.groupadministration.GetChatMember;
 import org.telegram.telegrambots.meta.api.methods.groupadministration.LeaveChat;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
@@ -50,10 +49,9 @@ public class TelegramBot extends TelegramLongPollingBot {
             .keyboard(new ArrayList<>() {{
                 add(new KeyboardRow() {{
                     add("Profile");
-                    add("Help");
                 }});
                 add(new KeyboardRow() {{
-                    add("About");
+                    add("Help");
                     add("Stats");
                 }});
             }})
@@ -135,9 +133,7 @@ public class TelegramBot extends TelegramLongPollingBot {
                 editMessageTextWithKeyboard(callbackQuery.getMessage(),
                         "Profile\n" +
                                 "ID: " + queryUser.getId() + "\n" +
-                                "Count of messages: " + queryUser.getCountOfMessages() + "\n" +
-                                "Count of messages in context: " + queryUser.getMessages().stream()
-                                .filter(m -> m.getRole().equals(Role.USER)).count(),
+                                "Count of messages: " + queryUser.getCountOfMessages(),
                         callbackQuery.getMessage().getReplyMarkup());
                 break;
         }
@@ -153,26 +149,26 @@ public class TelegramBot extends TelegramLongPollingBot {
                 return;
             }
             String text = message.getText();
-            long uid = message.getFrom().getId();
-            User chatUser = userRepository.findUserById(uid);
+            long userID = message.getFrom().getId();
+            User chatUser = userRepository.findUserById(userID);
             if (chatUser == null) {
-                User user = new User(uid);
+                User user = new User(userID);
                 user.getMessages().add(new ua.dmjdev.TelegramGPTBot.GPT.Message(Role.SYSTEM,
                         "I am a telegram bot that uses the ChatGPT API and sends your requests to ChatGPT and gives you answers to your questions"));
                 userRepository.save(user);
-                sendMessage(uid, "\uD83E\uDD16");
-                sendMessage(uid, "Welcome", mainMenu);
+                sendMessage(userID, "\uD83E\uDD16");
+                sendMessage(userID, "Welcome", mainMenu);
                 return;
             }
             List<ua.dmjdev.TelegramGPTBot.GPT.Message> chatUserMessages = chatUser.getMessages();
             if (text.startsWith("/start")) {
-                sendMessage(uid, "\uD83E\uDD16");
-                sendMessage(uid, "Hello", mainMenu);
+                sendMessage(userID, "\uD83E\uDD16");
+                sendMessage(userID, "Hello", mainMenu);
             } else {
                 if (execute(GetChatMember.builder()
                         .chatId("-1001875522662")
-                        .userId(uid).build()).getStatus().equals("left")) {
-                    sendMessage(uid, "You need to join our Channel for use this bot", InlineKeyboardMarkup.builder()
+                        .userId(userID).build()).getStatus().equals("left")) {
+                    sendMessage(userID, "You need to join our Channel for use this bot", InlineKeyboardMarkup.builder()
                             .keyboardRow(new ArrayList<>() {{
                                 add(InlineKeyboardButton.builder()
                                         .text("Join to channel")
@@ -183,24 +179,36 @@ public class TelegramBot extends TelegramLongPollingBot {
                 }
                 switch (text) {
                     case "Profile":
-                        sendProfile(chatUser);
-                        return;
                     case "/profile":
                         sendProfile(chatUser);
-                        break;
+                        return;
+                    case "Help":
+                    case "/help":
+                        sendInfoMessage(userID);
+                        return;
+                    case "Stats":
+                    case "/stats":
+                        sendMessage(userID, "Count of users: " + userRepository.count() + "\n" +
+                                "Count of messages: " + userRepository.findAll().stream()
+                                .map(u -> u.getCountOfMessages())
+                                .reduce(0, (sum, c) -> sum += c));
+                        return;
+                    case "/reset":
+                        clearMessages(chatUser);
+                        return;
                 }
                 if (text.length() > 350) {
-                    sendMessage(uid, "Max text size 350 symbols");
+                    sendMessage(userID, "Max text size 350 symbols");
                     return;
                 }
-                Message botMessage = sendMessage(uid, "\uD83D\uDCE4");
+                Message botMessage = sendMessage(userID, "\uD83D\uDCE4");
                 chatUserMessages.add(new ua.dmjdev.TelegramGPTBot.GPT.Message(Role.USER, text));
                 try {
                     ua.dmjdev.TelegramGPTBot.GPT.Message responseMessage = gptService.getResponse(chatUserMessages);
                     editMessageText(botMessage, responseMessage.getContent());
                     chatUserMessages.add(responseMessage);
                     chatUser.incCountOfMessages();
-                    while (chatUserMessages.size() <= 5) {
+                    while (chatUserMessages.size() >= 5) {
                         chatUserMessages.remove(1);
                     }
                     userRepository.save(chatUser);
@@ -212,16 +220,44 @@ public class TelegramBot extends TelegramLongPollingBot {
         }
     }
 
-    public Message sendMessage(long uid, String text) throws TelegramApiException {
+    private void sendInfoMessage(long userID) throws TelegramApiException {
+        sendMessage(userID, """
+                INFO
+                                
+                 I am a Telegram chatbot that uses ChatGPT, one of the latest in Artificial Intelligence language models, to answer any questions you may have. I am designed to provide helpful and informative replies to your requests. Simply start a conversation with me and type out your question, and I will respond as accurately and quickly as possible.
+                 
+                 You can ask me anything you want, and I will do my best to provide a suitable response. If I am unable to understand your request or provide an appropriate answer, I will let you know. Feel free to engage with me, share your thoughts, or ask me for recommendations.\s
+                 
+                 I'm continuously learning and updating my knowledge, so I get better with time. I'm here to assist you in any way I can.ae
+                                
+                Commands:
+                - /start: This command reloads the bot
+                                
+                - /profile: Use this command to view your current profile
+                                
+                - /reset: This command resets the context and any earlier interactions you might have had with the bot. It can be useful when you're trying to begin a new conversation or start over with a new topic.
+                                
+                - /help: This command will provide you with all of the instructions and information for the bot, including its purpose, features, and how to engage with it - this is what you're reading right now!
+                """);
+    }
+
+    private void clearMessages(User chatUser) throws TelegramApiException {
+        chatUser.setMessages(List.of(new ua.dmjdev.TelegramGPTBot.GPT.Message(Role.SYSTEM,
+                "I am a telegram bot that uses the ChatGPT API and sends your requests to ChatGPT and gives you answers to your questions")));
+        userRepository.save(chatUser);
+        sendMessage(chatUser.getId(), "Context cleared");
+    }
+
+    public Message sendMessage(long userID, String text) throws TelegramApiException {
         return execute(SendMessage.builder()
-                .chatId(uid)
+                .chatId(userID)
                 .text(text)
                 .parseMode("HTML").build());
     }
 
-    public Message sendMessage(long uid, String text, ReplyKeyboard keyboard) throws TelegramApiException {
+    public Message sendMessage(long userID, String text, ReplyKeyboard keyboard) throws TelegramApiException {
         return execute(SendMessage.builder()
-                .chatId(uid)
+                .chatId(userID)
                 .text(text)
                 .replyMarkup(keyboard)
                 .parseMode("HTML").build());
@@ -252,9 +288,7 @@ public class TelegramBot extends TelegramLongPollingBot {
                 .photo(new InputFile(Paths.get("src/main/resources/images/gpt-logo.png").toFile()))
                 .caption("Profile\n" +
                         "ID: " + user.getId() + "\n" +
-                        "Count of messages: " + user.getCountOfMessages() + "\n" +
-                        "Count of messages in context: " + user.getMessages().stream()
-                        .filter(m -> m.getRole().equals(Role.USER)).count())
+                        "Count of messages: " + user.getCountOfMessages())
                 .replyMarkup(InlineKeyboardMarkup.builder()
                         .keyboard(new ArrayList<>() {{
                             add(new ArrayList<>() {{
