@@ -29,7 +29,6 @@ public class BotInitializer {
             for (long id : config.getADMINS()) {
                 bot.sendMessage(id, "Bot started");
             }
-            bot.addLog("Bot started");
         } catch (TelegramApiException e) {
             throw new RuntimeException(e);
         }

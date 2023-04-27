@@ -17,16 +17,10 @@ public class BotConfig {
     private String token;
     @Value("${bot.admins}")
     private String admins;
-    @Value("${bot.logChannelId}")
-    private String logChannelID;
 
     public long[] getADMINS() {
         return Arrays.stream(admins.split(";"))
                 .mapToLong(Long::parseLong)
                 .toArray();
-    }
-
-    public long getLogChannelID() {
-        return Long.parseLong(logChannelID);
     }
 }

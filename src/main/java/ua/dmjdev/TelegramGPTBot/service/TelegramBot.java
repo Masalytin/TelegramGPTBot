@@ -7,10 +7,13 @@ import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.AnswerCallbackQuery;
 import org.telegram.telegrambots.meta.api.methods.ForwardMessage;
 import org.telegram.telegrambots.meta.api.methods.groupadministration.GetChatMember;
+import org.telegram.telegrambots.meta.api.methods.groupadministration.LeaveChat;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
+import org.telegram.telegrambots.meta.api.methods.send.SendPhoto;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageReplyMarkup;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText;
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
+import org.telegram.telegrambots.meta.api.objects.InputFile;
 import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
@@ -19,12 +22,12 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMar
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
-import ua.dmjdev.TelegramGPTBot.GPT.OpenAIResponse;
 import ua.dmjdev.TelegramGPTBot.GPT.Role;
 import ua.dmjdev.TelegramGPTBot.config.BotConfig;
 import ua.dmjdev.TelegramGPTBot.models.User;
 import ua.dmjdev.TelegramGPTBot.repo.UserRepository;
 
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
@@ -47,12 +50,11 @@ public class TelegramBot extends TelegramLongPollingBot {
             .keyboard(new ArrayList<>() {{
                 add(new KeyboardRow() {{
                     add("Profile");
-                    add("кнопки");
-                    add("пока");
+                    add("Help");
                 }});
                 add(new KeyboardRow() {{
-                    add("не");
-                    add("работают");
+                    add("About");
+                    add("Stats");
                 }});
             }})
             .resizeKeyboard(true).build();
@@ -65,6 +67,8 @@ public class TelegramBot extends TelegramLongPollingBot {
     @Override
     public void onUpdateReceived(Update update) {
         if (update.hasMessage()) {
+            if (!update.getMessage().isUserMessage())
+                return;
             new Thread(() -> {
                 MethodThread thread = new MethodThread(update.getMessage().getFrom().getId(), () -> {
                     try {
@@ -87,7 +91,7 @@ public class TelegramBot extends TelegramLongPollingBot {
         }
         if (update.hasCallbackQuery()) {
             new Thread(() -> {
-                MethodThread thread = new MethodThread(update.getMessage().getFrom().getId(), () -> {
+                MethodThread thread = new MethodThread(update.getCallbackQuery().getFrom().getId(), () -> {
                     try {
                         onCallbackQueryHandler(update.getCallbackQuery());
                     } catch (TelegramApiException e) {
@@ -127,8 +131,7 @@ public class TelegramBot extends TelegramLongPollingBot {
                 execute(AnswerCallbackQuery.builder()
                         .callbackQueryId(qid)
                         .text("Context deleted")
-                        .showAlert(true).build()
-                );
+                        .showAlert(true).build());
                 editMessageTextWithKeyboard(callbackQuery.getMessage(),
                         "Profile\n" +
                                 "ID: " + queryUser.getId() + "\n" +
@@ -141,21 +144,12 @@ public class TelegramBot extends TelegramLongPollingBot {
     }
 
     public void onMessageHandler(Message message) throws TelegramApiException {
-        execute(ForwardMessage.builder()
-                .fromChatId(message.getChatId())
-                .messageId(message.getMessageId())
-                .chatId(config.getLogChannelID())
-                .build());
-        addLog("<code>" + message.getFrom().getId() + "</code>");
         if (message.hasText()) {
             if (message.getChat().isGroupChat()) {
-                sendMessage(message.getChatId(), "I don't work in group chats", InlineKeyboardMarkup.builder()
-                        .keyboardRow(new ArrayList<>() {{
-                            add(InlineKeyboardButton.builder()
-                                    .text("G")
-                                    .url("gg.com").build()
-                            );
-                        }}).build());
+                sendMessage(message.getChatId(), "I don't working in group chats. Bye");
+                execute(LeaveChat.builder()
+                        .chatId(message.getChatId())
+                        .build());
                 return;
             }
             String text = message.getText();
@@ -175,25 +169,6 @@ public class TelegramBot extends TelegramLongPollingBot {
                 sendMessage(uid, "\uD83E\uDD16");
                 sendMessage(uid, "Hello", mainMenu);
             } else {
-                switch (text) {
-                    case "Profile":
-                        sendMessage(uid, "Profile\n" +
-                                        "ID: " + chatUser.getId() + "\n" +
-                                        "Count of messages: " + chatUser.getCountOfMessages() + "\n" +
-                                        "Count of messages in context: " + chatUserMessages.stream()
-                                        .filter(m -> m.getRole().equals(Role.USER)).count(),
-                                InlineKeyboardMarkup.builder()
-                                        .keyboard(new ArrayList<>() {{
-                                            add(new ArrayList<>() {{
-                                                add(InlineKeyboardButton.builder()
-                                                        .text("Delete context")
-                                                        .callbackData("remove-context").build()
-                                                );
-                                            }});
-                                        }}).build()
-                        );
-                        return;
-                }
                 if (execute(GetChatMember.builder()
                         .chatId("-1001875522662")
                         .userId(uid).build()).getStatus().equals("left")) {
@@ -206,21 +181,28 @@ public class TelegramBot extends TelegramLongPollingBot {
                             }}).build());
                     return;
                 }
-
+                switch (text) {
+                    case "Profile":
+                        sendProfile(chatUser);
+                        return;
+                    case "/profile":
+                        sendProfile(chatUser);
+                        break;
+                }
+                if (text.length() > 350) {
+                    sendMessage(uid, "Max text size 350 symbols");
+                    return;
+                }
                 Message botMessage = sendMessage(uid, "\uD83D\uDCE4");
                 chatUserMessages.add(new ua.dmjdev.TelegramGPTBot.GPT.Message(Role.USER, text));
                 try {
-                    OpenAIResponse response = gptService.getResponse(chatUserMessages);
-                    ua.dmjdev.TelegramGPTBot.GPT.Message responseMessage = response.getMessage();
-//                    if (response.getUsage().getTotalTokens() > 1800) {
-//                        for (int i = 0; i < 150; i++) {
-//                            //i -= chatUserMessages.get(1).getTokensCount();
-//                            chatUserMessages.remove(1);
-//                        }
-//                    }
+                    ua.dmjdev.TelegramGPTBot.GPT.Message responseMessage = gptService.getResponse(chatUserMessages);
                     editMessageText(botMessage, responseMessage.getContent());
                     chatUserMessages.add(responseMessage);
                     chatUser.incCountOfMessages();
+                    while (chatUserMessages.size() <= 5) {
+                        chatUserMessages.remove(1);
+                    }
                     userRepository.save(chatUser);
                 } catch (Exception e) {
                     e.printStackTrace();
@@ -264,8 +246,25 @@ public class TelegramBot extends TelegramLongPollingBot {
         );
     }
 
-    public void addLog(String text) throws TelegramApiException {
-        sendMessage(config.getLogChannelID(), text);
+    private void sendProfile(User user) throws TelegramApiException {
+        execute(SendPhoto.builder()
+                .chatId(user.getId())
+                .photo(new InputFile(Paths.get("src/main/resources/images/gpt-logo.png").toFile()))
+                .caption("Profile\n" +
+                        "ID: " + user.getId() + "\n" +
+                        "Count of messages: " + user.getCountOfMessages() + "\n" +
+                        "Count of messages in context: " + user.getMessages().stream()
+                        .filter(m -> m.getRole().equals(Role.USER)).count())
+                .replyMarkup(InlineKeyboardMarkup.builder()
+                        .keyboard(new ArrayList<>() {{
+                            add(new ArrayList<>() {{
+                                add(InlineKeyboardButton.builder()
+                                        .text("Delete context")
+                                        .callbackData("remove-context").build()
+                                );
+                            }});
+                        }}).build())
+                .build());
     }
 
     private static class MethodThread extends Thread {
@@ -273,10 +272,6 @@ public class TelegramBot extends TelegramLongPollingBot {
 
         public MethodThread(long userId, Runnable runnable) {
             super(runnable);
-            this.userId = userId;
-        }
-
-        public void setUserId(long userId) {
             this.userId = userId;
         }
     }

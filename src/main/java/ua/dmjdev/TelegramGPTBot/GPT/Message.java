@@ -10,8 +10,4 @@ import lombok.NoArgsConstructor;
 public class Message {
     private Role role;
     private String content;
-
-//    public int getTokensCount() {
-//        return 0;
-//    }
 }
